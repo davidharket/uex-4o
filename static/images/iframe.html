@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chat med Mia</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <style>
+        @font-face {
+            font-family: 'NeueRegradeRegular';
+            src: url('NeueRegradeRegular.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: 'NeueRegradeRegular', sans-serif;
+        }
+
+        #chat-container {
+            display: none;
+            width: 25vw;
+            height: 70vh;
+            background: #fff;
+            border-radius: 44px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            overflow: hidden;
+            position: fixed;
+            bottom: 120px;
+            right: 120px;
+            display: flex;
+            flex-direction: column;
+            padding-top: 20px;
+        }
+
+        #chat-header {
+            padding: 20px 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            border-radius: 44px 44px 0px 0px;
+            background: rgba(244,244,244, 0.9);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+        }
+
+        #chat-header img {
+            border-radius: 50%;
+            margin-bottom: 10px;
+            height: 40px;
+            width: 40px;
+        }
+
+        #messages-container {
+            overflow-y: auto;
+            padding: 10px 20px;
+            flex-grow: 1;
+            margin-top: 0px; /* Adjusted to avoid overlap with absolute header */
+        }
+
+        /* Custom scrollbar styles */
+        #messages-container::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        #messages-container::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        #messages-container::-webkit-scrollbar-thumb {
+            background-color: #F4F4F4;
+            border-radius: 10px;
+        }
+
+        #messages-container {
+            scrollbar-color: #F4F4F4 transparent;
+            scrollbar-width: thin;
+        }
+
+        #input-container {
+            display: flex;
+            padding: 20px;
+            background: #FFFFFF;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            border-radius: 0px 0px 44px 44px;
+        }
+
+        #input-wrapper {
+            display: flex;
+            align-items: center; /* Center items vertically */
+            justify-content: space-between; /* Spread items horizontally */
+            position: relative;
+            width: 100%;
+            border: solid 1px #cfcfcf;
+            border-radius: 30px;
+            padding-top: 2px;
+            padding-bottom: 2px;
+            padding-left: 10px;
+            padding-right: 5px;
+            background-color: white;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.03); /* Light drop-shadow */
+        }
+
+        #message-input {
+            width: calc(100% - 60px); /* Adjust the width to leave space for the button */
+            padding: 10px;
+            border: none; /* Remove border */
+            border-radius: 50px;
+            resize: none; /* Prevent the user from resizing the textarea */
+            overflow: hidden; /* Hide the default scrollbar of the textarea */
+            min-height: 40px; /* Set minimum height to keep single-line appearance */
+            box-sizing: border-box;
+            font-family: 'NeueRegradeRegular', sans-serif;
+            outline: none; /* Remove focus outline */
+        }
+
+        #send-message {
+            background: none;
+            border: none; /* Remove border */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            border-radius: 50%;
+            background-color: #2B9BFC;
+            outline: none; /* Remove focus outline */
+            opacity: 0.5; /* Initial opacity */
+            transition: opacity 0.3s; /* Smooth transition */
+        }
+
+        #send-message:hover {
+            opacity: 0.5; /* Hover state */
+        }
+
+        #send-message img {
+            width: 30px;
+            height: 35px;
+        }
+
+        .button {
+            background-color: #2B9BFC;
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .user-message {
+            align-self: flex-end;
+            display: flex;
+            flex-direction: row-reverse;
+        }
+
+        .user-message .message-text {
+            background-color: #2B9BFC;
+            color: #FFFFFF;
+            padding: 15px;
+            border-radius: 20px 20px 0px 20px;
+            margin: 5px 0;
+        }
+
+        .ai-message {
+            align-self: flex-start;
+            display: flex;
+        }
+
+        .ai-message .message-text {
+            background-color: #E9E9EB;
+            color: #000000;
+            padding: 15px;
+            border-radius: 20px 20px 20px 0px;
+            margin: 5px 0;
+        }
+
+        .message-container {
+            display: flex;
+            margin: 10px 0;
+        }
+
+        .message-text {
+            max-width: 80%;
+            word-wrap: break-word;
+            padding: 10px;
+        }
+
+        #open-chat {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: #2B9BFC;
+            background: #FFFFFF 0% 0% no-repeat padding-box;
+            box-shadow: 0px 3px 6px #00000029;
+            opacity: 1;
+            border: none;
+            cursor: pointer;
+        }
+
+        /* Loading animation */
+        .dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            margin: 0;
+            border-radius: 50%;
+            background-color: #B3B2B7;
+            animation: dot-flash 1.4s infinite linear;
+        }
+
+        .dot:nth-child(1) {
+            animation-delay: 0s;
+        }
+
+        .dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes dot-flash {
+            0%, 80%, 100% {
+                background-color: #B3B2B7;
+            }
+            40% {
+                background-color: #8E8D92;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="chat-container">
+        <div id="chat-header">
+            <img src="icon.svg" alt="Mia">
+            <span>Mia</span>
+        </div>
+        <div id="messages-container">
+            <!-- Loading dots animation -->
+            <div class="message-container ai-message" id="loading-message" style="padding-top: 90px">
+                <div class="message-text">
+                    <span class="dot"></span>
+                    <span class="dot"></span>
+                    <span class="dot"></span>
+                </div>
+            </div>
+            <!-- Initial message -->
+            <div class="message-container ai-message" id="initial-message" style="display: none; padding-top: 90px">
+                <div class="message-text">Hei, mitt navn er Mia! Hvordan kan jeg hjelpe deg i dag?</div>
+            </div>
+            <!-- Messages will be dynamically inserted here -->
+        </div>
+        <div id="input-container">
+            <div id="input-wrapper">
+                <textarea id="message-input" style="font-family: 'NeueRegradeRegular', sans-serif;" placeholder="Svar Mia" aria-label="Message input" rows="1"></textarea>
+                <button id="send-message">
+                    <img src="send.svg" alt="Send">
+                </button>
+            </div>
+        </div>
+    </div>
+    <button id="open-chat"><img src="uex.svg"></button>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            $('#open-chat').click(function() {
+                $('#chat-container').toggle();
+            });
+
+            $('#send-message').click(function() {
+                sendMessage();
+            });
+
+            $('#message-input').on('input', function() {
+                autoGrow(this);
+                toggleSendButton();
+            });
+
+            $('#message-input').keypress(function(e) {
+                if (e.which == 13 && !e.shiftKey) {
+                    sendMessage();
+                    e.preventDefault();
+                }
+            });
+
+            function sendMessage() {
+                const message = $('#message-input').val().trim();
+                if (message === '') return;
+
+                displayMessage(message, 'user');
+                $('#message-input').val('');
+                autoGrow($('#message-input')[0]);
+                toggleSendButton();
+                displayTypingIndicator();
+                setInputEnabled(false);
+
+                $.ajax({
+                    url: '/send_message',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ message: message }),
+                    success: function(response) {
+                        removeTypingIndicator();
+                        setInputEnabled(true);
+                        if (response.message) {
+                            displayMessage(response.message, 'ai');
+                        } else {
+                            displayMessage('MIA klarte ikke å finne et bra svar.', 'error');
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        removeTypingIndicator();
+                        setInputEnabled(true);
+                        displayMessage('Feil: ' + xhr.responseText, 'error');
+                    }
+                });
+            }
+
+            function displayMessage(message, sender) {
+                let messageContainer = createMessage(message, sender);
+                $('#messages-container').append(messageContainer);
+                scrollToBottom();
+            }
+
+            function createMessage(messageText, sender) {
+                let messageClass = sender === 'user' ? 'user-message' : 'ai-message';
+                return `<div class="message-container ${messageClass}"><div class="message-text">${messageText}</div></div>`;
+            }
+
+            function displayTypingIndicator() {
+                displayLoadingMessage();
+                setTimeout(function() {
+                    replaceLoadingMessage("Hei, mitt navn er Mia! Hvordan kan jeg hjelpe deg i dag?");
+                }, 2000);
+                scrollToBottom();
+            }
+
+            function displayLoadingMessage() {
+                $('#messages-container').append('<div class="message-container ai-message loading-message"><div class="message-text"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div></div>');
+            }
+
+            function replaceLoadingMessage(text) {
+                $('.loading-message').first().replaceWith('<div class="message-container ai-message"><div class="message-text">' + text + '</div></div>');
+                scrollToBottom();
+            }
+
+            function removeTypingIndicator() {
+                $('#messages-container .loading-message').remove();
+            }
+
+            function scrollToBottom() {
+                var messagesContainer = $('#messages-container');
+                messagesContainer.scrollTop(messagesContainer.prop("scrollHeight"));
+            }
+
+            function setInputEnabled(enabled) {
+                $('#message-input').prop('disabled', !enabled);
+                $('#send-message').prop('disabled', !enabled);
+                if (enabled) {
+                    $('#message-input').focus();
+                }
+            }
+
+            function autoGrow(element) {
+                element.style.height = "5px";
+                element.style.height = (element.scrollHeight) + "px";
+                if (element.scrollHeight <= 40) {
+                    element.style.height = "40px"; // Ensure minimum height of one line
+                }
+            }
+
+            function toggleSendButton() {
+                const message = $('#message-input').val().trim();
+                if (message === '') {
+                    $('#send-message').css('opacity', '0.5');
+                } else {
+                    $('#send-message').css('opacity', '1');
+                }
+            }
+
+            toggleSendButton(); // Initial call to set the correct opacity
+
+            // Show the initial message after 3 seconds
+            setTimeout(function() {
+                $('#loading-message').hide();
+                $('#initial-message').show();
+            }, 3000);
+        });
+    </script>
+</body>
+</html>

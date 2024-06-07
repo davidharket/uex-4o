@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chat med Mia</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <!-- Include the marked library for Markdown parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+    <div id="chat-container">
+        <div id="chat-header">
+            <img src="{{ url_for('static', filename='images/icon.svg') }}" alt="Mia">
+            <span>Mia</span>
+        </div>
+        <div id="messages-container">
+            <!-- Messages will be dynamically inserted here -->
+        </div>
+        <div id="input-container">
+            <div id="input-wrapper">
+                <textarea id="message-input" style="font-family: 'NeueRegradeRegular', sans-serif;" placeholder="Svar Mia" aria-label="Message input" rows="1"></textarea>
+                <button id="send-message">
+                    <img src="{{ url_for('static', filename='images/send.svg') }}" alt="Send">
+                </button>
+            </div>
+        </div>
+    </div>
+    <button id="open-chat"><img src="{{ url_for('static', filename='images/uex.svg') }}" alt="Open-chat" style="width: 70px; padding-top: 5px;"></button>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src="{{ url_for('static', filename='js/scripts.js') }}"></script>
+</body>
+</html>
