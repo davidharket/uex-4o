@@ -19,15 +19,24 @@ $(document).ready(function() {
     function checkInitialMessageStatus() {
         $.get('/initial_message_status', function(response) {
             initialSequenceDone = response.initial_message_shown;
-        }).done(function() {
-            if (!initialSequenceDone) {
-                $.post('/set_initial_message_shown', function() {
-                    displayLoadingMessage();
-                    setTimeout(function() {
-                        replaceLoadingMessage("Hei, mitt navn er Mia! Hvordan kan jeg hjelpe deg i dag?");
-                    }, 2000);
-                });
+            if (initialSequenceDone) {
+                loadChatHistory(); // Load chat history if initial message was already shown
             }
+        });
+    }
+
+    function loadChatHistory() {
+        $.get('/get_chat_history', function(chatHistory) {
+            $('#messages-container').empty(); // Clear the container to avoid duplication
+            chatHistory.forEach(function(message) {
+                if (message.role === 'assistant' && message.buttons) {
+                    displayMessage(message.content, message.role);
+                    displayButtons(message.buttons);
+                } else {
+                    displayMessage(message.content, message.role);
+                }
+            });
+            scrollToBottom(); // Ensure scroll to bottom after loading chat history
         });
     }
 
@@ -36,9 +45,17 @@ $(document).ready(function() {
             $('#chat-container').addClass('active');
             chatOpened = true;
             clearInterval(shakeInterval);
+            if (!initialSequenceDone) {
+                $.post('/set_initial_message_shown', function() {
+                    displayInitialMessage();
+                });
+            } else {
+                loadChatHistory(); // Load chat history if initial message was already shown
+            }
         } else {
             $('#chat-container').removeClass('active');
         }
+        scrollToBottom(); // Ensure scroll to bottom when chat is opened
     });
 
     $('#send-message').click(function() {
@@ -89,14 +106,24 @@ $(document).ready(function() {
                 } else {
                     displayMessage('MIA klarte ikke å finne et bra svar.', 'error');
                 }
+                scrollToBottom(); // Ensure scroll to bottom after receiving a message
             },
             error: function(xhr, status, error) {
                 removeTypingIndicator();
                 setInputEnabled(true);
                 isSendingMessage = false;
                 displayMessage('Feil: ' + xhr.responseText, 'error');
+                scrollToBottom(); // Ensure scroll to bottom after an error
             }
         });
+    }
+
+    function displayInitialMessage() {
+        displayLoadingMessage();
+        setTimeout(function() {
+            replaceLoadingMessage("Hei, mitt navn er Mia! Hvordan kan jeg hjelpe deg i dag?");
+            scrollToBottom(); // Ensure scroll to bottom after initial message
+        }, 2000);
     }
 
     function displayMessage(message, sender) {
@@ -118,7 +145,7 @@ $(document).ready(function() {
             $('#messages-container').append(messageContainer);
             removeNewMessageClass(messageContainer);
         }
-        scrollToBottom();
+        scrollToBottom(); // Ensure scroll to bottom after displaying a message
     }
 
     function displayButtons(buttons) {
@@ -134,7 +161,7 @@ $(document).ready(function() {
             </div>
         `;
         $('#messages-container').append(buttonContainerHtml);
-        scrollToBottom();
+        scrollToBottom(); // Ensure scroll to bottom after displaying buttons
     }
 
     function displayForm() {
@@ -152,7 +179,7 @@ $(document).ready(function() {
             </div>
         `;
         $('#messages-container').append(formHtml);
-        scrollToBottom();
+        scrollToBottom(); // Ensure scroll to bottom after displaying form
 
         $('#contact-form').submit(function(e) {
             e.preventDefault();
@@ -169,10 +196,12 @@ $(document).ready(function() {
                         alert(response.message);
                         removeSpinner();
                         displayMessage("Tusen takk! Meldingen din har blitt sendt:) En av våre kunderepresentanter tar kontakt med deg så raskt som mulig", 'ai');
+                        scrollToBottom(); // Ensure scroll to bottom after form submission success
                     },
                     error: function(xhr, status, error) {
                         alert('Failed to send email: ' + xhr.responseText);
                         removeSpinner();
+                        scrollToBottom(); // Ensure scroll to bottom after form submission error
                     }
                 });
             }
@@ -186,11 +215,12 @@ $(document).ready(function() {
             </div>
         `;
         $('#messages-container').append(spinnerHtml);
-        scrollToBottom();
+        scrollToBottom(); // Ensure scroll to bottom after showing spinner
     }
 
     function removeSpinner() {
         $('.spinner-container').remove();
+        scrollToBottom(); // Ensure scroll to bottom after removing spinner
     }
 
     function createMessage(messageText, sender) {
@@ -204,31 +234,30 @@ $(document).ready(function() {
         setTimeout(function() {
             $(messageContainer).removeClass('new-message');
         }, 500);
+        scrollToBottom(); // Ensure scroll to bottom after removing new message class
     }
 
     function displayTypingIndicator() {
         displayLoadingMessage();
-        setTimeout(function() {
-            replaceLoadingMessage("Hei, mitt navn er Mia! Hvordan kan jeg hjelpe deg i dag?");
-        }, 2000);
-        scrollToBottom();
     }
 
     function displayLoadingMessage() {
-        $('#messages-container').append('<div class="message-container ai-message loading-message" style="padding-top: 90px"><div class="message-text"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div></div>');
+        $('#messages-container').append('<div class="message-container ai-message loading-message"><div class="message-text"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div></div>');
+        scrollToBottom(); // Ensure scroll to bottom after displaying loading message
     }
 
     function replaceLoadingMessage(text) {
-        $('.loading-message').first().replaceWith('<div class="message-container ai-message" style="padding-top: 90px"><div class="message-text">' + text + '</div></div>');
-        scrollToBottom();
+        $('.loading-message').first().replaceWith('<div class="message-container ai-message"><div class="message-text">' + text + '</div></div>');
+        scrollToBottom(); // Ensure scroll to bottom after replacing loading message
     }
 
     function removeTypingIndicator() {
         $('#messages-container .loading-message').remove();
+        scrollToBottom(); // Ensure scroll to bottom after removing typing indicator
     }
 
     function scrollToBottom() {
-        var messagesContainer = $('#messages-container');
+        const messagesContainer = $('#messages-container');
         messagesContainer.scrollTop(messagesContainer.prop("scrollHeight"));
     }
 
@@ -257,6 +286,6 @@ $(document).ready(function() {
         }
     }
 
-    checkInitialMessageStatus();
     toggleSendButton();
+    checkInitialMessageStatus(); // Ensure initial status is checked on load
 });

@@ -39,12 +39,18 @@ def index():
 
 @app.route('/initial_message_status', methods=['GET'])
 def initial_message_status():
-    return jsonify({"initial_message_shown": session.get('initial_message_shown', False)})
+    initial_message_shown = session.get('initial_message_shown', False)
+    return jsonify({"initial_message_shown": initial_message_shown})
 
 @app.route('/set_initial_message_shown', methods=['POST'])
 def set_initial_message_shown():
-    session['initial_message_shown'] = True
-    session.modified = True
+    if not session.get('initial_message_shown'):
+        session['initial_message_shown'] = True
+        if 'chat_history' not in session:
+            session['chat_history'] = []
+        initial_message = {"role": "assistant", "content": "Hei, mitt navn er Mia! Hvordan kan jeg hjelpe deg i dag?"}
+        session['chat_history'].append(initial_message)
+        session.modified = True
     return jsonify({"status": "success"})
 
 @app.route('/send_message', methods=['POST'])
@@ -59,9 +65,20 @@ def send_message():
 
     session['chat_history'].append({"role": "user", "content": message})
     response_message, buttons = get_response(message)
-    session['chat_history'].append({"role": "assistant", "content": response_message})
+    assistant_message = {"role": "assistant", "content": response_message}
+    if buttons:
+        assistant_message["buttons"] = buttons
+    session['chat_history'].append(assistant_message)
+
+    session.modified = True  # Ensure session changes are saved
+
 
     return jsonify({"message": response_message, "buttons": buttons})
+
+@app.route('/get_chat_history', methods=['GET'])
+def get_chat_history():
+    chat_history = session.get('chat_history', [])
+    return jsonify(chat_history)
 
 @app.route('/submit_form', methods=['POST'])
 def submit_form():
