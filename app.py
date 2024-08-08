@@ -1,51 +1,106 @@
-from openai import *
-from flask import session
-from dotenv import load_dotenv
+from flask import Flask, render_template, request, jsonify, session
+from flask_mail import Mail, Message
+from flask_session import Session
+from chatbot_logic import get_response
+from datetime import timedelta
 import os
+from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
 
-# Initialize the OpenAI client
-client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+app = Flask(__name__)
 
-def get_response(message):
-    response_content = ""
-    buttons = []
+# Secret key for session management. Loaded from environment variable.
+app.secret_key = os.getenv('SECRET_KEY')
 
-    valid_roles = ["system", "user", "assistant"]
-    messages = [{"role": "system", "content": "Alltid svar kort. Omkring 25 ord. start en samtale, deretter gi ressurser etter du har et forhold med den du snakker med. Du er en assistent som hjelper de du snakker med med å forstå tjenester og å selge løsningen deres. Du jobber for Uex. Du er morsom og underholdende, men først av alt hjelpsom. Beskrivelse av Uex: 'Uex er et selskap som lager skreddersydde chat-applikasjoner med dynamisk funksjonalitet som kan plasseres på en hver nettside til en rimelig pris. Disse chatbottene kan fungere som salgsassistenter, guider, og så mye annet.' Som en som jobber for uex har du et par verktøy. Du kan bruke disse verktøyene ved å skrive de som en del av svaret ditt. Det første verktøyet er: {knapp_1}. Om du skriver {knapp_1} kommer det opp en knapp som lar kunder besøke 'Om oss'-siden. Det andre verktøyet er: {knapp_2}. Om du skriver {knapp_2} kommer det opp en knapp som lar kunder besøke 'Produkter'-siden. Det tredje verktøyet er: {skjema}. Om du skriver {skjema} kommer det opp et skjema som lar kunder ta direkte kontakt"}]
+# Configure server-side sessions
+app.config['SESSION_TYPE'] = 'filesystem'
+app.config['SESSION_PERMANENT'] = True
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
+app.config['SESSION_USE_SIGNER'] = True
+app.config['SESSION_FILE_DIR'] = './flask_session/'
+Session(app)
 
-    # Validate and append historical messages
-    for msg in session.get('chat_history', []):
-        if msg["role"] in valid_roles:
-            messages.append(msg)
-    # Append the current user message
-    messages.append({"role": "user", "content": message})
+# Ensure the session file directory exists
+if not os.path.exists(app.config['SESSION_FILE_DIR']):
+    os.makedirs(app.config['SESSION_FILE_DIR'])
+
+# Configure Flask-Mail
+app.config['MAIL_SERVER'] = os.getenv('MAIL_SERVER')
+app.config['MAIL_PORT'] = int(os.getenv('MAIL_PORT'))
+app.config['MAIL_USE_SSL'] = os.getenv('MAIL_USE_SSL').lower() in ['true', '1', 't']
+app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME')
+app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD')
+app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_DEFAULT_SENDER')
+mail = Mail(app)
+
+@app.route('/')
+def index():
+    if 'initial_message_shown' not in session:
+        session['initial_message_shown'] = False
+    return render_template('index.html')
+
+@app.route('/initial_message_status', methods=['GET'])
+def initial_message_status():
+    initial_message_shown = session.get('initial_message_shown', False)
+    return jsonify({"initial_message_shown": initial_message_shown})
+
+@app.route('/set_initial_message_shown', methods=['POST'])
+def set_initial_message_shown():
+    if not session.get('initial_message_shown'):
+        session['initial_message_shown'] = True
+        if 'chat_history' not in session:
+            session['chat_history'] = []
+        initial_message = {"role": "assistant", "content": "Hei, mitt navn er Mia! Hvordan kan jeg hjelpe deg i dag?"}
+        session['chat_history'].append(initial_message)
+        session.modified = True
+    return jsonify({"status": "success"})
+
+@app.route('/send_message', methods=['POST'])
+def send_message():
+    if 'chat_history' not in session:
+        session['chat_history'] = []
+
+    data = request.json
+    message = data.get('message')
+    if not message:
+        return jsonify({"message": "No message provided"}), 400
+
+    session['chat_history'].append({"role": "user", "content": message})
+    response_message, buttons = get_response(message)
+    assistant_message = {"role": "assistant", "content": response_message}
+    if buttons:
+        assistant_message["buttons"] = buttons
+    session['chat_history'].append(assistant_message)
+
+    session.modified = True  # Ensure session changes are saved
+
+    return jsonify({"message": response_message, "buttons": buttons})
+
+@app.route('/get_chat_history', methods=['GET'])
+def get_chat_history():
+    chat_history = session.get('chat_history', [])
+    return jsonify(chat_history)
+
+@app.route('/submit_form', methods=['POST'])
+def submit_form():
+    data = request.json
+    email = data.get('email')
+    message = data.get('message')
+
+    if not email or not message:
+        return jsonify({"message": "Email and message are required"}), 400
 
     try:
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=messages,
-            temperature=1,
-            max_tokens=255,
-            top_p=1,
-            frequency_penalty=0,
-            presence_penalty=0
-        )
+        msg = Message("New Contact Form Submission",
+                      recipients=['david@harket.no'])  # Replace with your recipient email
+        msg.body = f"Email: {email}\n\nMessage:\n{message}"
+        mail.send(msg)
+        return jsonify({"message": "Email sent successfully"})
+    except Exception as e:
+        error_message = str(e)
+        return jsonify({"message": f"Failed to send email: {error_message}"}), 500
 
-        response_content = response.choices[0].message.content
-
-        # Check for specific keywords to add buttons
-        if "{knapp_1}" in response_content:
-            buttons.append({"label": "Om oss", "link": "https://example.com/about"})
-            response_content = response_content.replace("{knapp_1}", "")
-
-        if "{knapp_2}" in response_content:
-            buttons.append({"label": "Produkter", "link": "https://example.com/products"})
-            response_content = response_content.replace("{knapp_2}", "")
-
-    except OpenAIError as e:
-        response_content = "An error occurred while processing your request. Please try again."
-
-    return response_content, buttons
+if __name__ == '__main__':
+    app.run(debug=True)
